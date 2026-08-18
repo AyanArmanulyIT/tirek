@@ -1,0 +1,88 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-central-1
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  ECR_REPO_PREFIX: tirek
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region $AWS_REGION \
+            | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+      - name: Build and push images
+        run: |
+          TAG=sha-${GITHUB_SHA::12}
+          for svc in api worker web; do
+            docker build -t $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_PREFIX-$svc:$TAG ./$([ "$svc" = "web" ] && echo frontend || echo backend)
+            docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO_PREFIX-$svc:$TAG
+          done
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+
+  deploy-staging:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Migrate (advisory lock protects concurrent deploys)
+        run: |
+          aws ecs run-task --cluster tirek-staging --task-definition tirek-migrate \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.STAGING_SUBNETS }}],securityGroups=[${{ secrets.STAGING_SG }}]}" \
+            --launch-type FARGATE --count 1 --wait-for-stoppage
+      - name: Deploy services
+        run: |
+          for svc in api worker web; do
+            aws ecs update-service --cluster tirek-staging --service tirek-$svc \
+              --force-new-deployment --task-definition tirek-$svc:latest
+          done
+
+  deploy-production:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Migrate
+        run: |
+          aws ecs run-task --cluster tirek-prod --task-definition tirek-migrate \
+            --network-configuration "awsvpcConfiguration={subnets=[${{ secrets.PROD_SUBNETS }}],securityGroups=[${{ secrets.PROD_SG }}]}" \
+            --launch-type FARGATE --count 1 --wait-for-stoppage
+      - name: Deploy services
+        run: |
+          for svc in api worker web; do
+            aws ecs update-service --cluster tirek-prod --service tirek-$svc \
+              --force-new-deployment --task-definition tirek-$svc:latest
+          done
