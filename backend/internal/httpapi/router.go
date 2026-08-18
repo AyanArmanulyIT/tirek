@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
 
+	"tirek/backend/internal/catalog"
 	"tirek/backend/internal/identity"
 	"tirek/backend/internal/organizations"
 	"tirek/backend/internal/platform/config"
@@ -44,9 +45,11 @@ func New(cfg config.Config, pool *pgxpool.Pool, log zerolog.Logger) *Server {
 	restaurantsHandler := restaurants.NewHandler(restaurantsSvc, log)
 	suppliersSvc := suppliers.NewService(pool, log)
 	suppliersHandler := suppliers.NewHandler(suppliersSvc, log)
+	catalogSvc := catalog.NewService(pool, log)
+	catalogHandler := catalog.NewHandler(catalogSvc, log)
 
 	s := &Server{cfg: cfg, pool: pool, log: log, identity: svc}
-	s.handler = s.buildRouter(identityHandler, restaurantsHandler, suppliersHandler, orgs)
+	s.handler = s.buildRouter(identityHandler, restaurantsHandler, suppliersHandler, catalogHandler, orgs)
 	return s
 }
 
@@ -56,7 +59,7 @@ func (s *Server) Handler() http.Handler { return s.handler }
 // Identity returns the identity service (used by tests).
 func (s *Server) Identity() *identity.Service { return s.identity }
 
-func (s *Server) buildRouter(ih *identity.Handler, rh *restaurants.Handler, sh *suppliers.Handler, orgs *organizations.Service) http.Handler {
+func (s *Server) buildRouter(ih *identity.Handler, rh *restaurants.Handler, sh *suppliers.Handler, ch *catalog.Handler, orgs *organizations.Service) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chimiddleware.RequestID)
 	r.Use(chimiddleware.RealIP)
@@ -112,6 +115,28 @@ func (s *Server) buildRouter(ih *identity.Handler, rh *restaurants.Handler, sh *
 				Get("/suppliers/{supplierId}", sh.Get)
 			r.With(identity.RequireAnyPermission([]string{"suppliers.write", "suppliers.manage"}, orgs)).
 				Patch("/suppliers/{supplierId}", sh.Update)
+
+			// Catalog: product management (supplier organizations).
+			// NOTE: categories are registered before /products/{productId} so
+			// chi routes them to the category handlers.
+			r.With(identity.RequireAnyPermission([]string{"catalog.read", "catalog.manage"}, orgs)).
+				Get("/products/categories", ch.ListCategories)
+			r.With(identity.RequireAnyPermission([]string{"catalog.manage"}, orgs)).
+				Post("/products/categories", ch.CreateCategory)
+			r.With(identity.RequireAnyPermission([]string{"catalog.read", "catalog.manage"}, orgs)).
+				Get("/products", ch.List)
+			r.With(identity.RequireAnyPermission([]string{"catalog.manage"}, orgs)).
+				Post("/products", ch.Create)
+			r.With(identity.RequireAnyPermission([]string{"catalog.read", "catalog.manage"}, orgs)).
+				Get("/products/{productId}", ch.Get)
+			r.With(identity.RequireAnyPermission([]string{"catalog.manage"}, orgs)).
+				Patch("/products/{productId}", ch.Update)
+
+			// Catalog: marketplace browsing (buyer organizations).
+			r.With(identity.RequireAnyPermission([]string{"catalog.read", "catalog.manage"}, orgs)).
+				Get("/catalog/products", ch.Browse)
+			r.With(identity.RequireAnyPermission([]string{"catalog.read", "catalog.manage"}, orgs)).
+				Get("/catalog/categories", ch.BrowseCategories)
 		})
 	})
 

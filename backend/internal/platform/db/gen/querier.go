@@ -11,11 +11,22 @@ import (
 )
 
 type Querier interface {
+	// Marketplace browsing (buyer tenant; RLS exposes only active supplier products).
+	BrowseCatalogProducts(ctx context.Context, arg BrowseCatalogProductsParams) ([]BrowseCatalogProductsRow, error)
+	CountBrowseCatalogProducts(ctx context.Context, arg CountBrowseCatalogProductsParams) (int64, error)
+	CountCatalogCategories(ctx context.Context, orgID uuid.UUID) (int64, error)
+	CountCatalogCategoriesForBrowse(ctx context.Context) (int64, error)
+	CountCatalogProducts(ctx context.Context, orgID uuid.UUID) (int64, error)
 	CountRecentLoginFailuresByIP(ctx context.Context, arg CountRecentLoginFailuresByIPParams) (int64, error)
 	CountRecentLoginFailuresByUser(ctx context.Context, arg CountRecentLoginFailuresByUserParams) (int64, error)
 	CountRestaurantLocations(ctx context.Context, arg CountRestaurantLocationsParams) (int64, error)
 	CountRestaurants(ctx context.Context, orgID uuid.UUID) (int64, error)
 	CountSuppliers(ctx context.Context, orgID uuid.UUID) (int64, error)
+	CreateCatalogCategory(ctx context.Context, arg CreateCatalogCategoryParams) (CreateCatalogCategoryRow, error)
+	// Catalog queries (0004_catalog_products.sql). Money is BIGINT minor units +
+	// CHAR(3) currency. Marketplace queries are buyer-scoped; RLS exposes only the
+	// active products of all suppliers.
+	CreateCatalogProduct(ctx context.Context, arg CreateCatalogProductParams) (CreateCatalogProductRow, error)
 	CreateMembership(ctx context.Context, arg CreateMembershipParams) (Membership, error)
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
 	CreateRestaurant(ctx context.Context, arg CreateRestaurantParams) (Restaurant, error)
@@ -25,6 +36,9 @@ type Querier interface {
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateSupplier(ctx context.Context, arg CreateSupplierParams) (Supplier, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	GetCatalogCategoryByID(ctx context.Context, categoryID uuid.UUID) (GetCatalogCategoryByIDRow, error)
+	GetCatalogPrice(ctx context.Context, productID uuid.UUID) (CatalogPrice, error)
+	GetCatalogProductByID(ctx context.Context, productID uuid.UUID) (GetCatalogProductByIDRow, error)
 	GetMembershipByUserOrg(ctx context.Context, arg GetMembershipByUserOrgParams) (Membership, error)
 	GetOrganizationByID(ctx context.Context, orgID uuid.UUID) (Organization, error)
 	GetRestaurantByID(ctx context.Context, restaurantID uuid.UUID) (Restaurant, error)
@@ -41,6 +55,9 @@ type Querier interface {
 	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
 	InsertAuthEvent(ctx context.Context, arg InsertAuthEventParams) error
 	InsertRefreshHistory(ctx context.Context, arg InsertRefreshHistoryParams) error
+	ListCatalogCategories(ctx context.Context, orgID uuid.UUID) ([]ListCatalogCategoriesRow, error)
+	ListCatalogCategoriesForBrowse(ctx context.Context) ([]ListCatalogCategoriesForBrowseRow, error)
+	ListCatalogProducts(ctx context.Context, arg ListCatalogProductsParams) ([]ListCatalogProductsRow, error)
 	ListMembershipRolesByUserOrg(ctx context.Context, arg ListMembershipRolesByUserOrgParams) ([]ListMembershipRolesByUserOrgRow, error)
 	ListRestaurantLocations(ctx context.Context, arg ListRestaurantLocationsParams) ([]Outlet, error)
 	ListRestaurants(ctx context.Context, arg ListRestaurantsParams) ([]Restaurant, error)
@@ -49,9 +66,11 @@ type Querier interface {
 	RevokeSession(ctx context.Context, arg RevokeSessionParams) (Session, error)
 	RotateSession(ctx context.Context, arg RotateSessionParams) (Session, error)
 	SetUserDefaultOrg(ctx context.Context, arg SetUserDefaultOrgParams) error
+	UpdateCatalogProduct(ctx context.Context, arg UpdateCatalogProductParams) (UpdateCatalogProductRow, error)
 	UpdateRestaurant(ctx context.Context, arg UpdateRestaurantParams) (Restaurant, error)
 	UpdateRestaurantLocation(ctx context.Context, arg UpdateRestaurantLocationParams) (Outlet, error)
 	UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) (Supplier, error)
+	UpsertCatalogPrice(ctx context.Context, arg UpsertCatalogPriceParams) (CatalogPrice, error)
 }
 
 var _ Querier = (*Queries)(nil)

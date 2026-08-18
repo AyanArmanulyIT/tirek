@@ -48,6 +48,7 @@ function Header({
   const { user, org } = data;
   const canWriteRestaurants = can(data, "restaurants", "write");
   const canWriteSuppliers = can(data, "suppliers", "write");
+  const canManageCatalog = can(data, "catalog", "manage");
 
   function navLink(href: string, label: string) {
     const active = pathname === href || pathname.startsWith(`${href}/`);
@@ -73,6 +74,8 @@ function Header({
           <nav className="flex items-center gap-1">
             {navLink("/dashboard", "Dashboard")}
             {org.type === "buyer" && navLink("/restaurants", "Restaurants")}
+            {org.type === "supplier" && navLink("/products", "Products")}
+            {org.type === "buyer" && navLink("/catalog", "Browse products")}
             {org.type === "supplier" && navLink("/supplier", "Supplier profile")}
           </nav>
         </div>
@@ -95,6 +98,14 @@ function Header({
               className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700"
             >
               Edit profile
+            </Link>
+          )}
+          {org.type === "supplier" && canManageCatalog && (
+            <Link
+              href="/products/new"
+              className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700"
+            >
+              New product
             </Link>
           )}
           <button

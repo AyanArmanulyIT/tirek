@@ -37,6 +37,41 @@ type AuthEvent struct {
 	CreatedAt  time.Time   `json:"created_at"`
 }
 
+type CatalogCategory struct {
+	CategoryID uuid.UUID   `json:"category_id"`
+	OrgID      uuid.UUID   `json:"org_id"`
+	Name       string      `json:"name"`
+	ParentID   pgtype.UUID `json:"parent_id"`
+	CreatedAt  time.Time   `json:"created_at"`
+	UpdatedAt  time.Time   `json:"updated_at"`
+}
+
+type CatalogPrice struct {
+	PriceID        uuid.UUID   `json:"price_id"`
+	ProductID      uuid.UUID   `json:"product_id"`
+	OrgID          uuid.UUID   `json:"org_id"`
+	Currency       string      `json:"currency"`
+	UnitPriceMinor int64       `json:"unit_price_minor"`
+	MinQuantity    int32       `json:"min_quantity"`
+	EffectiveFrom  pgtype.Date `json:"effective_from"`
+}
+
+type CatalogProduct struct {
+	ProductID   uuid.UUID   `json:"product_id"`
+	OrgID       uuid.UUID   `json:"org_id"`
+	CategoryID  pgtype.UUID `json:"category_id"`
+	Name        string      `json:"name"`
+	Sku         pgtype.Text `json:"sku"`
+	Description pgtype.Text `json:"description"`
+	Unit        string      `json:"unit"`
+	VatRateBps  int32       `json:"vat_rate_bps"`
+	ImageS3Key  pgtype.Text `json:"image_s3_key"`
+	Status      string      `json:"status"`
+	MinOrderQty int32       `json:"min_order_qty"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
+}
+
 type Membership struct {
 	MembershipID uuid.UUID `json:"membership_id"`
 	OrgID        uuid.UUID `json:"org_id"`

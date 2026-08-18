@@ -177,3 +177,40 @@ CREATE TABLE audit_logs (
     created_at   timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_audit_org_time ON audit_logs (org_id, created_at DESC);
+
+-- Catalog (evolved by 0004_catalog_products.sql; RLS in migrations).
+
+CREATE TABLE catalog_categories (
+    category_id     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id          uuid NOT NULL REFERENCES organizations(org_id) ON DELETE CASCADE,
+    name            text NOT NULL,
+    parent_id       uuid REFERENCES catalog_categories(category_id),
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE catalog_products (
+    product_id      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id          uuid NOT NULL REFERENCES organizations(org_id) ON DELETE CASCADE,
+    category_id     uuid REFERENCES catalog_categories(category_id),
+    name            text NOT NULL,
+    sku             text,
+    description     text,
+    unit            text NOT NULL,
+    vat_rate_bps    int NOT NULL DEFAULT 1200,
+    image_s3_key    text,
+    status          text NOT NULL DEFAULT 'draft',
+    min_order_qty   int NOT NULL DEFAULT 1,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE catalog_prices (
+    price_id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    product_id      uuid NOT NULL REFERENCES catalog_products(product_id) ON DELETE CASCADE,
+    org_id          uuid NOT NULL REFERENCES organizations(org_id) ON DELETE CASCADE,
+    currency        char(3) NOT NULL DEFAULT 'KZT' CHECK (currency ~ '^[A-Z]{3}$'),
+    unit_price_minor bigint NOT NULL CHECK (unit_price_minor >= 0),
+    min_quantity    int NOT NULL DEFAULT 1,
+    effective_from  date NOT NULL DEFAULT current_date
+);
