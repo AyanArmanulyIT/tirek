@@ -13,28 +13,45 @@ import (
 type Querier interface {
 	CountRecentLoginFailuresByIP(ctx context.Context, arg CountRecentLoginFailuresByIPParams) (int64, error)
 	CountRecentLoginFailuresByUser(ctx context.Context, arg CountRecentLoginFailuresByUserParams) (int64, error)
+	CountRestaurantLocations(ctx context.Context, arg CountRestaurantLocationsParams) (int64, error)
+	CountRestaurants(ctx context.Context, orgID uuid.UUID) (int64, error)
+	CountSuppliers(ctx context.Context, orgID uuid.UUID) (int64, error)
 	CreateMembership(ctx context.Context, arg CreateMembershipParams) (Membership, error)
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
+	CreateRestaurant(ctx context.Context, arg CreateRestaurantParams) (Restaurant, error)
+	CreateRestaurantLocation(ctx context.Context, arg CreateRestaurantLocationParams) (Outlet, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
 	CreateRolePermission(ctx context.Context, arg CreateRolePermissionParams) error
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
+	CreateSupplier(ctx context.Context, arg CreateSupplierParams) (Supplier, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	GetMembershipByUserOrg(ctx context.Context, arg GetMembershipByUserOrgParams) (Membership, error)
 	GetOrganizationByID(ctx context.Context, orgID uuid.UUID) (Organization, error)
+	GetRestaurantByID(ctx context.Context, restaurantID uuid.UUID) (Restaurant, error)
+	GetRestaurantLocationByID(ctx context.Context, outletID uuid.UUID) (Outlet, error)
 	GetRoleByID(ctx context.Context, roleID uuid.UUID) (Role, error)
 	GetRoleByOrgName(ctx context.Context, arg GetRoleByOrgNameParams) (Role, error)
 	GetSessionByRefreshHash(ctx context.Context, refreshHash string) (Session, error)
 	GetSessionByRefreshHashForUpdate(ctx context.Context, refreshHash string) (Session, error)
 	GetSessionIDByHistoryHash(ctx context.Context, refreshHash string) (uuid.UUID, error)
+	GetSupplierByID(ctx context.Context, supplierID uuid.UUID) (Supplier, error)
+	GetSupplierByOrgID(ctx context.Context, orgID uuid.UUID) (Supplier, error)
 	GetUserByEmail(ctx context.Context, lower string) (User, error)
 	GetUserByID(ctx context.Context, userID uuid.UUID) (User, error)
+	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
 	InsertAuthEvent(ctx context.Context, arg InsertAuthEventParams) error
 	InsertRefreshHistory(ctx context.Context, arg InsertRefreshHistoryParams) error
 	ListMembershipRolesByUserOrg(ctx context.Context, arg ListMembershipRolesByUserOrgParams) ([]ListMembershipRolesByUserOrgRow, error)
+	ListRestaurantLocations(ctx context.Context, arg ListRestaurantLocationsParams) ([]Outlet, error)
+	ListRestaurants(ctx context.Context, arg ListRestaurantsParams) ([]Restaurant, error)
 	ListRolePermissions(ctx context.Context, roleID uuid.UUID) ([]string, error)
+	ListSuppliers(ctx context.Context, arg ListSuppliersParams) ([]Supplier, error)
 	RevokeSession(ctx context.Context, arg RevokeSessionParams) (Session, error)
 	RotateSession(ctx context.Context, arg RotateSessionParams) (Session, error)
 	SetUserDefaultOrg(ctx context.Context, arg SetUserDefaultOrgParams) error
+	UpdateRestaurant(ctx context.Context, arg UpdateRestaurantParams) (Restaurant, error)
+	UpdateRestaurantLocation(ctx context.Context, arg UpdateRestaurantLocationParams) (Outlet, error)
+	UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) (Supplier, error)
 }
 
 var _ Querier = (*Queries)(nil)

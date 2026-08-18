@@ -30,7 +30,7 @@ export default function RegisterPage() {
     try {
       const res = await register(form);
       sessionStorage.setItem("tirek_access_token", res.access_token);
-      router.push("/me");
+      router.push("/dashboard");
     } catch (err) {
       setError(problemMessage(err));
     } finally {

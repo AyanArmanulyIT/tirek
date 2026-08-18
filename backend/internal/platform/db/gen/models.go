@@ -12,6 +12,20 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AuditLog struct {
+	ID         uuid.UUID   `json:"id"`
+	OrgID      pgtype.UUID `json:"org_id"`
+	ActorID    pgtype.UUID `json:"actor_id"`
+	Action     string      `json:"action"`
+	EntityType string      `json:"entity_type"`
+	EntityID   pgtype.Text `json:"entity_id"`
+	Before     []byte      `json:"before"`
+	After      []byte      `json:"after"`
+	Ip         *netip.Addr `json:"ip"`
+	UserAgent  pgtype.Text `json:"user_agent"`
+	CreatedAt  time.Time   `json:"created_at"`
+}
+
 type AuthEvent struct {
 	EventID    uuid.UUID   `json:"event_id"`
 	UserID     pgtype.UUID `json:"user_id"`
@@ -43,9 +57,39 @@ type Organization struct {
 	UpdatedAt       time.Time   `json:"updated_at"`
 }
 
+type Outlet struct {
+	OutletID     uuid.UUID   `json:"outlet_id"`
+	RestaurantID uuid.UUID   `json:"restaurant_id"`
+	OrgID        uuid.UUID   `json:"org_id"`
+	Name         string      `json:"name"`
+	Address      string      `json:"address"`
+	City         string      `json:"city"`
+	Country      string      `json:"country"`
+	Status       string      `json:"status"`
+	Phone        pgtype.Text `json:"phone"`
+	Email        pgtype.Text `json:"email"`
+	CreatedAt    time.Time   `json:"created_at"`
+	UpdatedAt    time.Time   `json:"updated_at"`
+}
+
 type Permission struct {
 	PermissionID string `json:"permission_id"`
 	Description  string `json:"description"`
+}
+
+type Restaurant struct {
+	RestaurantID    uuid.UUID   `json:"restaurant_id"`
+	OrgID           uuid.UUID   `json:"org_id"`
+	Name            string      `json:"name"`
+	LegalName       pgtype.Text `json:"legal_name"`
+	Bin             pgtype.Text `json:"bin"`
+	Status          string      `json:"status"`
+	Country         string      `json:"country"`
+	DefaultCurrency string      `json:"default_currency"`
+	Phone           pgtype.Text `json:"phone"`
+	Email           pgtype.Text `json:"email"`
+	CreatedAt       time.Time   `json:"created_at"`
+	UpdatedAt       time.Time   `json:"updated_at"`
 }
 
 type Role struct {
@@ -79,6 +123,36 @@ type SessionRefreshHistory struct {
 	SessionID   uuid.UUID `json:"session_id"`
 	RefreshHash string    `json:"refresh_hash"`
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+type Supplier struct {
+	SupplierID      uuid.UUID      `json:"supplier_id"`
+	OrgID           uuid.UUID      `json:"org_id"`
+	Name            string         `json:"name"`
+	LegalName       pgtype.Text    `json:"legal_name"`
+	Bin             pgtype.Text    `json:"bin"`
+	PayoutAccount   pgtype.Text    `json:"payout_account"`
+	PaymentTerms    string         `json:"payment_terms"`
+	Rating          pgtype.Numeric `json:"rating"`
+	Status          string         `json:"status"`
+	Country         string         `json:"country"`
+	DefaultCurrency string         `json:"default_currency"`
+	Phone           pgtype.Text    `json:"phone"`
+	Email           pgtype.Text    `json:"email"`
+	CreatedAt       time.Time      `json:"created_at"`
+	UpdatedAt       time.Time      `json:"updated_at"`
+}
+
+type SupplierContact struct {
+	ContactID  uuid.UUID   `json:"contact_id"`
+	SupplierID uuid.UUID   `json:"supplier_id"`
+	OrgID      uuid.UUID   `json:"org_id"`
+	FullName   string      `json:"full_name"`
+	Phone      pgtype.Text `json:"phone"`
+	Email      pgtype.Text `json:"email"`
+	Role       pgtype.Text `json:"role"`
+	CreatedAt  time.Time   `json:"created_at"`
+	UpdatedAt  time.Time   `json:"updated_at"`
 }
 
 type User struct {

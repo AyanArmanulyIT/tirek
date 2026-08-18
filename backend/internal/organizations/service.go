@@ -21,15 +21,16 @@ import (
 var SystemRoleOrder = []string{"owner", "admin", "procurement", "accountant", "finance", "viewer"}
 
 // SystemRoles maps system role names to their permission sets. It mirrors the
-// seed data in backend/migrations/0001_init.sql and is applied to every new
-// organization at registration.
+// seed data in backend/migrations/0001_init.sql (and 0003 for the
+// restaurants/suppliers permissions) and is applied to every new organization
+// at registration.
 var SystemRoles = map[string][]string{
 	"owner":       {"org.owner"},
-	"admin":       {"orders.create", "orders.confirm", "catalog.manage", "invoices.approve", "payments.approve", "payments.refund", "finance.request", "ledger.read", "audit.read", "members.manage", "settings.manage"},
-	"procurement": {"orders.create", "catalog.manage"},
+	"admin":       {"orders.create", "orders.confirm", "catalog.manage", "invoices.approve", "payments.approve", "payments.refund", "finance.request", "ledger.read", "audit.read", "members.manage", "settings.manage", "restaurants.manage", "suppliers.manage"},
+	"procurement": {"orders.create", "catalog.manage", "restaurants.read"},
 	"accountant":  {"invoices.approve", "ledger.read"},
 	"finance":     {"finance.request", "ledger.read"},
-	"viewer":      {"ledger.read"},
+	"viewer":      {"ledger.read", "restaurants.read", "suppliers.read"},
 }
 
 // Service is the organizations module service.

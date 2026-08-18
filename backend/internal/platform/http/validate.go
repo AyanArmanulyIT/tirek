@@ -85,6 +85,20 @@ func (v *Validator) OneOf(field, value string, allowed ...string) {
 	v.Add(field, fmt.Sprintf("must be one of: %s", strings.Join(allowed, ", ")))
 }
 
+var upperAlphaRe = regexp.MustCompile(`^[A-Z]+$`)
+
+// UpperAlpha validates that a value is exactly n uppercase ASCII letters
+// (used for ISO country codes and currency codes).
+func (v *Validator) UpperAlpha(field, value string, n int) {
+	if value == "" {
+		v.Add(field, "is required")
+		return
+	}
+	if len(value) != n || !upperAlphaRe.MatchString(value) {
+		v.Add(field, fmt.Sprintf("must be %d uppercase letters", n))
+	}
+}
+
 var uuidRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 // UUID validates a canonical UUID string.

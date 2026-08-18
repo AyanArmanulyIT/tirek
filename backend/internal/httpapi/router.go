@@ -15,6 +15,8 @@ import (
 	"tirek/backend/internal/organizations"
 	"tirek/backend/internal/platform/config"
 	platformhttp "tirek/backend/internal/platform/http"
+	"tirek/backend/internal/restaurants"
+	"tirek/backend/internal/suppliers"
 )
 
 // Server holds the long-lived dependencies for the HTTP API.
@@ -38,8 +40,13 @@ func New(cfg config.Config, pool *pgxpool.Pool, log zerolog.Logger) *Server {
 	svc := identity.NewService(pool, tokens, orgs, log)
 	identityHandler := identity.NewHandler(svc, cfg.Auth, cfg.Auth.CookieName, log)
 
+	restaurantsSvc := restaurants.NewService(pool, log)
+	restaurantsHandler := restaurants.NewHandler(restaurantsSvc, log)
+	suppliersSvc := suppliers.NewService(pool, log)
+	suppliersHandler := suppliers.NewHandler(suppliersSvc, log)
+
 	s := &Server{cfg: cfg, pool: pool, log: log, identity: svc}
-	s.handler = s.buildRouter(identityHandler)
+	s.handler = s.buildRouter(identityHandler, restaurantsHandler, suppliersHandler, orgs)
 	return s
 }
 
@@ -49,7 +56,7 @@ func (s *Server) Handler() http.Handler { return s.handler }
 // Identity returns the identity service (used by tests).
 func (s *Server) Identity() *identity.Service { return s.identity }
 
-func (s *Server) buildRouter(ih *identity.Handler) http.Handler {
+func (s *Server) buildRouter(ih *identity.Handler, rh *restaurants.Handler, sh *suppliers.Handler, orgs *organizations.Service) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chimiddleware.RequestID)
 	r.Use(chimiddleware.RealIP)
@@ -79,6 +86,32 @@ func (s *Server) buildRouter(ih *identity.Handler) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(s.identity.Authenticate)
 			r.Get("/me", ih.Me)
+
+			// Restaurants (buyer organizations)
+			r.With(identity.RequireAnyPermission([]string{"restaurants.read", "restaurants.manage"}, orgs)).
+				Get("/restaurants", rh.List)
+			r.With(identity.RequireAnyPermission([]string{"restaurants.write", "restaurants.manage"}, orgs)).
+				Post("/restaurants", rh.Create)
+			r.With(identity.RequireAnyPermission([]string{"restaurants.read", "restaurants.manage"}, orgs)).
+				Get("/restaurants/{restaurantId}", rh.Get)
+			r.With(identity.RequireAnyPermission([]string{"restaurants.write", "restaurants.manage"}, orgs)).
+				Patch("/restaurants/{restaurantId}", rh.Update)
+			r.With(identity.RequireAnyPermission([]string{"restaurants.read", "restaurants.manage"}, orgs)).
+				Get("/restaurants/{restaurantId}/locations", rh.ListLocations)
+			r.With(identity.RequireAnyPermission([]string{"restaurants.write", "restaurants.manage"}, orgs)).
+				Post("/restaurants/{restaurantId}/locations", rh.CreateLocation)
+			r.With(identity.RequireAnyPermission([]string{"restaurants.write", "restaurants.manage"}, orgs)).
+				Patch("/restaurants/{restaurantId}/locations/{locationId}", rh.UpdateLocation)
+
+			// Suppliers (supplier organizations)
+			r.With(identity.RequireAnyPermission([]string{"suppliers.read", "suppliers.manage"}, orgs)).
+				Get("/suppliers", sh.List)
+			r.With(identity.RequireAnyPermission([]string{"suppliers.write", "suppliers.manage"}, orgs)).
+				Post("/suppliers", sh.Create)
+			r.With(identity.RequireAnyPermission([]string{"suppliers.read", "suppliers.manage"}, orgs)).
+				Get("/suppliers/{supplierId}", sh.Get)
+			r.With(identity.RequireAnyPermission([]string{"suppliers.write", "suppliers.manage"}, orgs)).
+				Patch("/suppliers/{supplierId}", sh.Update)
 		})
 	})
 
