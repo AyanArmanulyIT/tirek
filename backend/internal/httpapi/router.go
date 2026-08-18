@@ -14,6 +14,7 @@ import (
 	"tirek/backend/internal/identity"
 	"tirek/backend/internal/organizations"
 	"tirek/backend/internal/platform/config"
+	platformhttp "tirek/backend/internal/platform/http"
 )
 
 // Server holds the long-lived dependencies for the HTTP API.
@@ -52,6 +53,7 @@ func (s *Server) buildRouter(ih *identity.Handler) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chimiddleware.RequestID)
 	r.Use(chimiddleware.RealIP)
+	r.Use(platformhttp.CORSMiddleware(s.cfg.API.WebOrigin))
 	r.Use(chimiddleware.Recoverer)
 	r.Use(s.loggerMiddleware)
 
