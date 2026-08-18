@@ -72,6 +72,18 @@ type CatalogProduct struct {
 	UpdatedAt   time.Time   `json:"updated_at"`
 }
 
+type IdempotencyKey struct {
+	ID           uuid.UUID   `json:"id"`
+	OrgID        pgtype.UUID `json:"org_id"`
+	Key          string      `json:"key"`
+	Endpoint     string      `json:"endpoint"`
+	RequestHash  string      `json:"request_hash"`
+	ResponseBody []byte      `json:"response_body"`
+	ResponseCode pgtype.Int4 `json:"response_code"`
+	CreatedAt    time.Time   `json:"created_at"`
+	ExpiresAt    time.Time   `json:"expires_at"`
+}
+
 type Membership struct {
 	MembershipID uuid.UUID `json:"membership_id"`
 	OrgID        uuid.UUID `json:"org_id"`
@@ -90,6 +102,19 @@ type Organization struct {
 	Status          string      `json:"status"`
 	CreatedAt       time.Time   `json:"created_at"`
 	UpdatedAt       time.Time   `json:"updated_at"`
+}
+
+type OutboxEvent struct {
+	ID          int64       `json:"id"`
+	OrgID       pgtype.UUID `json:"org_id"`
+	Topic       string      `json:"topic"`
+	EntityID    string      `json:"entity_id"`
+	Payload     []byte      `json:"payload"`
+	Status      string      `json:"status"`
+	Attempts    int32       `json:"attempts"`
+	ScheduledAt time.Time   `json:"scheduled_at"`
+	CreatedAt   time.Time   `json:"created_at"`
+	UpdatedAt   time.Time   `json:"updated_at"`
 }
 
 type Outlet struct {
@@ -112,6 +137,29 @@ type Permission struct {
 	Description  string `json:"description"`
 }
 
+type ProcurementCart struct {
+	CartID    uuid.UUID `json:"cart_id"`
+	OrgID     uuid.UUID `json:"org_id"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type ProcurementCartItem struct {
+	CartItemID     uuid.UUID `json:"cart_item_id"`
+	CartID         uuid.UUID `json:"cart_id"`
+	OrgID          uuid.UUID `json:"org_id"`
+	ProductID      uuid.UUID `json:"product_id"`
+	SupplierOrgID  uuid.UUID `json:"supplier_org_id"`
+	ProductName    string    `json:"product_name"`
+	Quantity       int32     `json:"quantity"`
+	Unit           string    `json:"unit"`
+	UnitPriceMinor int64     `json:"unit_price_minor"`
+	Currency       string    `json:"currency"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
 type Restaurant struct {
 	RestaurantID    uuid.UUID   `json:"restaurant_id"`
 	OrgID           uuid.UUID   `json:"org_id"`
@@ -125,6 +173,36 @@ type Restaurant struct {
 	Email           pgtype.Text `json:"email"`
 	CreatedAt       time.Time   `json:"created_at"`
 	UpdatedAt       time.Time   `json:"updated_at"`
+}
+
+type Rfq struct {
+	RfqID          uuid.UUID                 `json:"rfq_id"`
+	OrgID          uuid.UUID                 `json:"org_id"`
+	SupplierOrgID  uuid.UUID                 `json:"supplier_org_id"`
+	OutletID       pgtype.UUID               `json:"outlet_id"`
+	Number         string                    `json:"number"`
+	Status         string                    `json:"status"`
+	DeliveryWindow pgtype.Range[pgtype.Date] `json:"delivery_window"`
+	Currency       string                    `json:"currency"`
+	TotalMinor     int64                     `json:"total_minor"`
+	CreatedBy      pgtype.UUID               `json:"created_by"`
+	CreatedAt      time.Time                 `json:"created_at"`
+	UpdatedAt      time.Time                 `json:"updated_at"`
+}
+
+type RfqItem struct {
+	RfqItemID      uuid.UUID   `json:"rfq_item_id"`
+	RfqID          uuid.UUID   `json:"rfq_id"`
+	OrgID          uuid.UUID   `json:"org_id"`
+	ProductID      uuid.UUID   `json:"product_id"`
+	Description    string      `json:"description"`
+	Quantity       int32       `json:"quantity"`
+	Unit           string      `json:"unit"`
+	ProductName    pgtype.Text `json:"product_name"`
+	Sku            pgtype.Text `json:"sku"`
+	UnitPriceMinor pgtype.Int8 `json:"unit_price_minor"`
+	Currency       pgtype.Text `json:"currency"`
+	LineTotalMinor pgtype.Int8 `json:"line_total_minor"`
 }
 
 type Role struct {

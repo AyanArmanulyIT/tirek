@@ -365,6 +365,138 @@ export function browseCategories(accessToken: string) {
   return request<ListResponse<Category>>("/api/v1/catalog/categories", {}, accessToken);
 }
 
+// --- Procurement (cart + purchase requests) ---
+
+export type RequestStatus = "submitted" | "cancelled";
+
+export interface CartItem {
+  cart_item_id: string;
+  cart_id: string;
+  product_id: string;
+  supplier_org_id: string;
+  supplier_name: string;
+  product_name: string;
+  quantity: number;
+  unit: string;
+  unit_price_minor: number;
+  currency: string;
+  line_total_minor: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SupplierGroup {
+  supplier_org_id: string;
+  supplier_name: string;
+  items: CartItem[];
+  total_minor: number;
+  currency: string;
+}
+
+export interface Cart {
+  cart_id: string;
+  org_id: string;
+  status: string;
+  groups: SupplierGroup[];
+  total_minor: number;
+  currency: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RequestItem {
+  request_item_id: string;
+  request_id: string;
+  product_id: string;
+  product_name: string;
+  sku?: string;
+  quantity: number;
+  unit: string;
+  unit_price_minor: number;
+  currency: string;
+  line_total_minor: number;
+}
+
+export interface PurchaseRequest {
+  request_id: string;
+  org_id: string;
+  supplier_org_id: string;
+  supplier_name?: string;
+  buyer_name?: string;
+  number: string;
+  status: RequestStatus;
+  currency: string;
+  total_minor: number;
+  items: RequestItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubmitResult {
+  requests: PurchaseRequest[];
+}
+
+export function getCart(accessToken: string) {
+  return request<Cart>("/api/v1/procurement/cart", {}, accessToken);
+}
+
+export function addCartItem(accessToken: string, productId: string, quantity: number) {
+  return request<Cart>("/api/v1/procurement/cart/items", {
+    method: "POST",
+    body: JSON.stringify({ product_id: productId, quantity }),
+  }, accessToken);
+}
+
+export function updateCartItem(accessToken: string, itemId: string, quantity: number) {
+  return request<Cart>(`/api/v1/procurement/cart/items/${itemId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ quantity }),
+  }, accessToken);
+}
+
+export function removeCartItem(accessToken: string, itemId: string) {
+  return request<Cart>(`/api/v1/procurement/cart/items/${itemId}`, {
+    method: "DELETE",
+  }, accessToken);
+}
+
+export function submitCart(accessToken: string, idempotencyKey?: string) {
+  return request<SubmitResult>("/api/v1/procurement/submit", {
+    method: "POST",
+    ...(idempotencyKey ? { headers: { "Idempotency-Key": idempotencyKey } } : {}),
+  }, accessToken);
+}
+
+export function listRequests(accessToken: string, offset = 0, limit = 50) {
+  return request<ListResponse<PurchaseRequest>>(
+    `/api/v1/procurement/requests?offset=${offset}&limit=${limit}`,
+    {},
+    accessToken,
+  );
+}
+
+export function getRequest(accessToken: string, requestId: string) {
+  return request<PurchaseRequest>(`/api/v1/procurement/requests/${requestId}`, {}, accessToken);
+}
+
+export function cancelRequest(accessToken: string, requestId: string) {
+  return request<PurchaseRequest>(`/api/v1/procurement/requests/${requestId}/cancel`, {
+    method: "PATCH",
+  }, accessToken);
+}
+
+export function listIncoming(accessToken: string, offset = 0, limit = 50) {
+  return request<ListResponse<PurchaseRequest>>(
+    `/api/v1/procurement/incoming?offset=${offset}&limit=${limit}`,
+    {},
+    accessToken,
+  );
+}
+
+export function getIncoming(accessToken: string, requestId: string) {
+  return request<PurchaseRequest>(`/api/v1/procurement/incoming/${requestId}`, {}, accessToken);
+}
+
 // formatMinor renders integer minor units as a human-readable amount, e.g.
 // 85000 KZT → "850.00 ₸". Money is never handled as a float in the backend;
 // the minor-unit integers are only formatted here for display.
@@ -399,7 +531,7 @@ export function hasPermission(me: Pick<MeResponse, "role" | "permissions">, perm
 
 export function can(
   me: Pick<MeResponse, "role" | "permissions">,
-  prefix: "restaurants" | "suppliers" | "catalog",
+  prefix: "restaurants" | "suppliers" | "catalog" | "procurement",
   level: "read" | "write" | "manage",
 ): boolean {
   if (hasPermission(me, `${prefix}.manage`)) {

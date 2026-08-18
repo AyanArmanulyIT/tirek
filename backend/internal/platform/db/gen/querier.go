@@ -13,10 +13,20 @@ import (
 type Querier interface {
 	// Marketplace browsing (buyer tenant; RLS exposes only active supplier products).
 	BrowseCatalogProducts(ctx context.Context, arg BrowseCatalogProductsParams) ([]BrowseCatalogProductsRow, error)
+	// Cancel a purchase request (buyer-only; RLS restricts the update to the
+	// buyer's own tenant and the status guard below prevents re-cancellation).
+	CancelPurchaseRequest(ctx context.Context, rfqID uuid.UUID) (CancelPurchaseRequestRow, error)
+	// Idempotency for purchase request submission. Claiming the key first makes a
+	// concurrent duplicate fail-safe: only one transaction owns the key; the loser
+	// replays the stored response or returns a conflict.
+	ClaimIdempotencyKey(ctx context.Context, arg ClaimIdempotencyKeyParams) (ClaimIdempotencyKeyRow, error)
+	CompleteIdempotencyKey(ctx context.Context, arg CompleteIdempotencyKeyParams) error
 	CountBrowseCatalogProducts(ctx context.Context, arg CountBrowseCatalogProductsParams) (int64, error)
 	CountCatalogCategories(ctx context.Context, orgID uuid.UUID) (int64, error)
 	CountCatalogCategoriesForBrowse(ctx context.Context) (int64, error)
 	CountCatalogProducts(ctx context.Context, orgID uuid.UUID) (int64, error)
+	CountIncomingRequests(ctx context.Context, supplierOrgID uuid.UUID) (int64, error)
+	CountPurchaseRequests(ctx context.Context, orgID uuid.UUID) (int64, error)
 	CountRecentLoginFailuresByIP(ctx context.Context, arg CountRecentLoginFailuresByIPParams) (int64, error)
 	CountRecentLoginFailuresByUser(ctx context.Context, arg CountRecentLoginFailuresByUserParams) (int64, error)
 	CountRestaurantLocations(ctx context.Context, arg CountRestaurantLocationsParams) (int64, error)
@@ -29,6 +39,8 @@ type Querier interface {
 	CreateCatalogProduct(ctx context.Context, arg CreateCatalogProductParams) (CreateCatalogProductRow, error)
 	CreateMembership(ctx context.Context, arg CreateMembershipParams) (Membership, error)
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
+	CreatePurchaseRequest(ctx context.Context, arg CreatePurchaseRequestParams) (Rfq, error)
+	CreatePurchaseRequestItem(ctx context.Context, arg CreatePurchaseRequestItemParams) (RfqItem, error)
 	CreateRestaurant(ctx context.Context, arg CreateRestaurantParams) (Restaurant, error)
 	CreateRestaurantLocation(ctx context.Context, arg CreateRestaurantLocationParams) (Outlet, error)
 	CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error)
@@ -36,11 +48,32 @@ type Querier interface {
 	CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error)
 	CreateSupplier(ctx context.Context, arg CreateSupplierParams) (Supplier, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	DeleteCartItem(ctx context.Context, arg DeleteCartItemParams) (int64, error)
+	DeleteCartItems(ctx context.Context, cartID uuid.UUID) error
+	GetActiveCart(ctx context.Context, orgID uuid.UUID) (ProcurementCart, error)
+	// Lock the active cart and its items for an atomic submission.
+	GetActiveCartForUpdate(ctx context.Context, orgID uuid.UUID) (ProcurementCart, error)
+	GetCartItem(ctx context.Context, arg GetCartItemParams) (ProcurementCartItem, error)
 	GetCatalogCategoryByID(ctx context.Context, categoryID uuid.UUID) (GetCatalogCategoryByIDRow, error)
 	GetCatalogPrice(ctx context.Context, productID uuid.UUID) (CatalogPrice, error)
 	GetCatalogProductByID(ctx context.Context, productID uuid.UUID) (GetCatalogProductByIDRow, error)
+	GetIdempotencyKey(ctx context.Context, arg GetIdempotencyKeyParams) (GetIdempotencyKeyRow, error)
+	GetIncomingRequest(ctx context.Context, rfqID uuid.UUID) (GetIncomingRequestRow, error)
 	GetMembershipByUserOrg(ctx context.Context, arg GetMembershipByUserOrgParams) (Membership, error)
+	// Procurement queries (0005_procurement_cart.sql). Money is BIGINT minor units
+	// + CHAR(3) currency; cart item and rfq_item price fields are immutable
+	// snapshots taken at add/submission time. Carts are strictly tenant-scoped
+	// (RLS); rfqs expose supplier_incoming via a SELECT-only RLS policy.
+	// Get or create the single active cart for the caller's organization. On
+	// conflict (cart already exists) returns no rows; the caller then loads the
+	// existing cart with GetActiveCart.
+	GetOrCreateActiveCart(ctx context.Context, orgID uuid.UUID) (ProcurementCart, error)
 	GetOrganizationByID(ctx context.Context, orgID uuid.UUID) (Organization, error)
+	// Purchasable product for the marketplace: only ACTIVE products with a current
+	// price are visible to buyer tenants (RLS enforces the same rule).
+	GetPurchasableProduct(ctx context.Context, productID uuid.UUID) (GetPurchasableProductRow, error)
+	GetPurchaseRequest(ctx context.Context, rfqID uuid.UUID) (GetPurchaseRequestRow, error)
+	GetPurchaseRequestItems(ctx context.Context, rfqID uuid.UUID) ([]RfqItem, error)
 	GetRestaurantByID(ctx context.Context, restaurantID uuid.UUID) (Restaurant, error)
 	GetRestaurantLocationByID(ctx context.Context, outletID uuid.UUID) (Outlet, error)
 	GetRoleByID(ctx context.Context, roleID uuid.UUID) (Role, error)
@@ -54,11 +87,18 @@ type Querier interface {
 	GetUserByID(ctx context.Context, userID uuid.UUID) (User, error)
 	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
 	InsertAuthEvent(ctx context.Context, arg InsertAuthEventParams) error
+	// Outbox: signal downstream systems (future Orders module) that a purchase
+	// request was submitted. Written in the same transaction as the rfq.
+	InsertOutboxEvent(ctx context.Context, arg InsertOutboxEventParams) error
 	InsertRefreshHistory(ctx context.Context, arg InsertRefreshHistoryParams) error
+	ListCartItemsByCart(ctx context.Context, cartID uuid.UUID) ([]ListCartItemsByCartRow, error)
+	ListCartItemsByCartForUpdate(ctx context.Context, cartID uuid.UUID) ([]ProcurementCartItem, error)
 	ListCatalogCategories(ctx context.Context, orgID uuid.UUID) ([]ListCatalogCategoriesRow, error)
 	ListCatalogCategoriesForBrowse(ctx context.Context) ([]ListCatalogCategoriesForBrowseRow, error)
 	ListCatalogProducts(ctx context.Context, arg ListCatalogProductsParams) ([]ListCatalogProductsRow, error)
+	ListIncomingRequests(ctx context.Context, arg ListIncomingRequestsParams) ([]ListIncomingRequestsRow, error)
 	ListMembershipRolesByUserOrg(ctx context.Context, arg ListMembershipRolesByUserOrgParams) ([]ListMembershipRolesByUserOrgRow, error)
+	ListPurchaseRequests(ctx context.Context, arg ListPurchaseRequestsParams) ([]ListPurchaseRequestsRow, error)
 	ListRestaurantLocations(ctx context.Context, arg ListRestaurantLocationsParams) ([]Outlet, error)
 	ListRestaurants(ctx context.Context, arg ListRestaurantsParams) ([]Restaurant, error)
 	ListRolePermissions(ctx context.Context, roleID uuid.UUID) ([]string, error)
@@ -66,10 +106,14 @@ type Querier interface {
 	RevokeSession(ctx context.Context, arg RevokeSessionParams) (Session, error)
 	RotateSession(ctx context.Context, arg RotateSessionParams) (Session, error)
 	SetUserDefaultOrg(ctx context.Context, arg SetUserDefaultOrgParams) error
+	UpdateCartItemQuantity(ctx context.Context, arg UpdateCartItemQuantityParams) (ProcurementCartItem, error)
 	UpdateCatalogProduct(ctx context.Context, arg UpdateCatalogProductParams) (UpdateCatalogProductRow, error)
 	UpdateRestaurant(ctx context.Context, arg UpdateRestaurantParams) (Restaurant, error)
 	UpdateRestaurantLocation(ctx context.Context, arg UpdateRestaurantLocationParams) (Outlet, error)
 	UpdateSupplier(ctx context.Context, arg UpdateSupplierParams) (Supplier, error)
+	// Add a product to the cart or merge quantities (same active product added
+	// twice merges at the original price snapshot).
+	UpsertCartItem(ctx context.Context, arg UpsertCartItemParams) (ProcurementCartItem, error)
 	UpsertCatalogPrice(ctx context.Context, arg UpsertCatalogPriceParams) (CatalogPrice, error)
 }
 

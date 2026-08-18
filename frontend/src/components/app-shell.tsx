@@ -76,6 +76,9 @@ function Header({
             {org.type === "buyer" && navLink("/restaurants", "Restaurants")}
             {org.type === "supplier" && navLink("/products", "Products")}
             {org.type === "buyer" && navLink("/catalog", "Browse products")}
+            {org.type === "buyer" && can(data, "procurement", "write") && navLink("/procurement/cart", "Cart")}
+            {org.type === "buyer" && can(data, "procurement", "read") && navLink("/procurement/requests", "Requests")}
+            {org.type === "supplier" && can(data, "procurement", "read") && navLink("/procurement/incoming", "Incoming")}
             {org.type === "supplier" && navLink("/supplier", "Supplier profile")}
           </nav>
         </div>

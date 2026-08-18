@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { SessionProvider, useSession } from "@/lib/session";
 import {
+  addCartItem,
   browseCatalog,
   browseCategories,
+  can,
   formatMinor,
   problemMessage,
   type CatalogProduct,
@@ -33,6 +36,8 @@ function Catalog() {
   const [categoryId, setCategoryId] = useState("");
   const [offset, setOffset] = useState(0);
   const [error, setError] = useState("");
+  const [adding, setAdding] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState("");
 
   useEffect(() => {
     if (state.kind !== "loaded") {
@@ -64,6 +69,20 @@ function Catalog() {
     return null;
   }
 
+  async function handleAdd(product: CatalogProduct) {
+    setAdding(product.product_id);
+    setFeedback("");
+    try {
+      await addCartItem(token, product.product_id, 1);
+      setFeedback(`"${product.name}" added to cart`);
+    } catch (err) {
+      setFeedback(problemMessage(err));
+    } finally {
+      setAdding(null);
+    }
+  }
+
+  const canProcurement = can(state.data, "procurement", "write");
   const page = Math.floor(offset / PAGE_SIZE);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -71,7 +90,19 @@ function Catalog() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Marketplace</h1>
+        {canProcurement && (
+          <Link
+            href="/procurement/cart"
+            className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700"
+          >
+            View cart
+          </Link>
+        )}
       </div>
+
+      {feedback && (
+        <p className="rounded bg-emerald-50 p-3 text-sm text-emerald-700">{feedback}</p>
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
         <input
@@ -128,6 +159,15 @@ function Catalog() {
                 </span>
                 <span className="text-xs text-gray-500">per {p.unit}</span>
               </div>
+              {canProcurement && (
+                <button
+                  onClick={() => handleAdd(p)}
+                  disabled={adding === p.product_id}
+                  className="mt-3 w-full rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {adding === p.product_id ? "Adding…" : "Add to cart"}
+                </button>
+              )}
             </article>
           ))}
         </div>

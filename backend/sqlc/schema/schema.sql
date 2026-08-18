@@ -214,3 +214,91 @@ CREATE TABLE catalog_prices (
     min_quantity    int NOT NULL DEFAULT 1,
     effective_from  date NOT NULL DEFAULT current_date
 );
+-- Procurement (evolved by 0005_procurement_cart.sql; RLS in migrations).
+
+CREATE TABLE procurement_carts (
+    cart_id      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id       uuid NOT NULL REFERENCES organizations(org_id) ON DELETE CASCADE,
+    status       text NOT NULL DEFAULT 'active' CHECK (status IN ('active','abandoned')),
+    created_at   timestamptz NOT NULL DEFAULT now(),
+    updated_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX uq_procurement_carts_org_active
+    ON procurement_carts (org_id) WHERE status = 'active';
+
+CREATE TABLE procurement_cart_items (
+    cart_item_id     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    cart_id          uuid NOT NULL REFERENCES procurement_carts(cart_id) ON DELETE CASCADE,
+    org_id           uuid NOT NULL REFERENCES organizations(org_id) ON DELETE CASCADE,
+    product_id       uuid NOT NULL REFERENCES catalog_products(product_id),
+    supplier_org_id  uuid NOT NULL REFERENCES organizations(org_id),
+    product_name     text NOT NULL,
+    quantity         int NOT NULL CHECK (quantity > 0),
+    unit             text NOT NULL,
+    unit_price_minor bigint NOT NULL CHECK (unit_price_minor >= 0),
+    currency         char(3) NOT NULL CHECK (currency ~ '^[A-Z]{3}$'),
+    created_at       timestamptz NOT NULL DEFAULT now(),
+    updated_at       timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX uq_cart_items_cart_product
+    ON procurement_cart_items (cart_id, product_id);
+
+CREATE TABLE rfqs (
+    rfq_id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id          uuid NOT NULL REFERENCES organizations(org_id) ON DELETE CASCADE,
+    supplier_org_id uuid NOT NULL REFERENCES organizations(org_id),
+    outlet_id       uuid REFERENCES outlets(outlet_id),
+    number          text NOT NULL,
+    status          text NOT NULL DEFAULT 'submitted'
+        CHECK (status IN ('submitted','cancelled')),
+    delivery_window daterange,
+    currency        char(3) NOT NULL DEFAULT 'KZT' CHECK (currency ~ '^[A-Z]{3}$'),
+    total_minor     bigint NOT NULL DEFAULT 0 CHECK (total_minor >= 0),
+    created_by      uuid REFERENCES users(user_id),
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (org_id, number)
+);
+
+CREATE TABLE rfq_items (
+    rfq_item_id     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    rfq_id          uuid NOT NULL REFERENCES rfqs(rfq_id) ON DELETE CASCADE,
+    org_id          uuid NOT NULL REFERENCES organizations(org_id) ON DELETE CASCADE,
+    product_id      uuid NOT NULL REFERENCES catalog_products(product_id),
+    description     text NOT NULL,
+    quantity        int NOT NULL CHECK (quantity > 0),
+    unit            text NOT NULL,
+    product_name    text,
+    sku             text,
+    unit_price_minor bigint CHECK (unit_price_minor >= 0),
+    currency        char(3) CHECK (currency ~ '^[A-Z]{3}$'),
+    line_total_minor bigint CHECK (line_total_minor >= 0)
+);
+
+-- Platform (0001_init.sql).
+
+CREATE TABLE idempotency_keys (
+    id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id        uuid,
+    key           text NOT NULL,
+    endpoint      text NOT NULL,
+    request_hash  text NOT NULL,
+    response_body jsonb,
+    response_code int,
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    expires_at    timestamptz NOT NULL DEFAULT now() + interval '24 hours'
+);
+CREATE UNIQUE INDEX uq_idempotency ON idempotency_keys (org_id, key, endpoint);
+
+CREATE TABLE outbox_events (
+    id            bigserial PRIMARY KEY,
+    org_id        uuid,
+    topic         text NOT NULL,
+    entity_id     text NOT NULL,
+    payload       jsonb NOT NULL DEFAULT '{}'::jsonb,
+    status        text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','processing','done','retry','dead')),
+    attempts      int  NOT NULL DEFAULT 0,
+    scheduled_at  timestamptz NOT NULL DEFAULT now(),
+    created_at    timestamptz NOT NULL DEFAULT now(),
+    updated_at    timestamptz NOT NULL DEFAULT now()
+);
